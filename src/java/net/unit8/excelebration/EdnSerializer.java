@@ -1,9 +1,7 @@
 package net.unit8.excelebration;
 
-import clojure.lang.Keyword;
-import clojure.lang.PersistentArrayMap;
-import clojure.lang.PersistentVector;
-import clojure.lang.RT;
+import clojure.lang.*;
+import org.parboiled.common.StringUtils;
 import org.pegdown.ast.*;
 
 import java.util.HashMap;
@@ -136,19 +134,19 @@ public class EdnSerializer implements Visitor {
     public void visit(QuotedNode node) {
         switch (node.getType()) {
             case DoubleAngle:
-                current = current.cons("<<");
+                visitText("<<");
                 visitChildren(node);
-                current = current.cons(">>");
+                visitText(">>");
                 break;
             case Double:
-                current = current.cons("\"");
+                visitText("\"");
                 visitChildren(node);
-                current = current.cons("\"");
+                visitText("\"");
                 break;
             case Single:
-                current = current.cons("\'");
+                visitText("\'");
                 visitChildren(node);
-                current = current.cons("\'");
+                visitText("\'");
                 break;
         }
     }
@@ -177,16 +175,16 @@ public class EdnSerializer implements Visitor {
     public void visit(SimpleNode node) {
         switch(node.getType()) {
             case Apostrophe:
-                current = current.cons("'");
+                visitText("'");
                 break;
             case Ellipsis:
-                current = current.cons("…");
+                visitText("…");
                 break;
             case Emdash:
-                current = current.cons("ー");
+                visitText("ー");
                 break;
             case Endash:
-                current = current.cons("―");
+                visitText("―");
                 break;
             case HRule:
                 current = current.cons(PersistentVector.create(RT.keyword(null, "hr")));
@@ -195,16 +193,11 @@ public class EdnSerializer implements Visitor {
                 current = current.cons(PersistentVector.create(RT.keyword(null, "br")));
                 break;
             case Nbsp:
-                current = current.cons(" ");
+                visitText(" ");
                 break;
             default:
                 throw new IllegalStateException();
         }
-    }
-
-    @Override
-    public void visit(SpecialTextNode node) {
-        current = current.cons(node.getText());
     }
 
     @Override
@@ -261,7 +254,7 @@ public class EdnSerializer implements Visitor {
 
     @Override
     public void visit(TableColumnNode node) {
-
+        // TODO
     }
 
     @Override
@@ -286,7 +279,21 @@ public class EdnSerializer implements Visitor {
 
     @Override
     public void visit(VerbatimNode node) {
-        // TODO
+        PersistentVector pre = PersistentVector.create(RT.keyword(null, "pre"));
+        PersistentVector code = PersistentVector.create(RT.keyword(null, "code"));
+        if (StringUtils.isNotEmpty(node.getType())) {
+            code = code.cons(PersistentHashMap.create(
+                    RT.keyword(null, "class"),
+                    node.getType()));
+        }
+        String text = node.getText();
+        while (text.charAt(0) == '\n') {
+            code = code.cons(RT.keyword(null, "br"));
+            text = text.substring(1);
+        }
+        pre = pre.cons(code.cons(text));
+        PersistentVector tmp = current;
+        current = current.cons(pre);
     }
 
     @Override
@@ -294,9 +301,26 @@ public class EdnSerializer implements Visitor {
         // TODO
     }
 
+    private void visitText(String text) {
+        if (current.peek() instanceof String) {
+            String lastText = (String) current.peek();
+            current = current.assocN(current.size() - 1, lastText + text);
+        } else {
+            current = current.cons(text);
+        }
+    }
+
+    private void visitText(TextNode node) {
+        visitText(node.getText());
+    }
     @Override
     public void visit(TextNode node) {
-        current = current.cons(node.getText());
+        visitText(node);
+    }
+
+    @Override
+    public void visit(SpecialTextNode node) {
+        visitText(node);
     }
 
     @Override
