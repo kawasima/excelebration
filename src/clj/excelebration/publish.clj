@@ -75,7 +75,8 @@
   (render-with-template renderer source
                         (if-let [template-file (:template options)]
                           (read-template template-file)
-                          ['(with-sheet renderer "Sheet1" (render {:x 0 :y 0} sources))])))
+                          ['(doseq [source sources]
+                              (with-sheet renderer "Sheet1" (render {:x 0 :y 0} (wrap-src source))))])))
 
 (defn publish [in-file out-file fmt options]
   (with-open [rdr (io/reader in-file)]
