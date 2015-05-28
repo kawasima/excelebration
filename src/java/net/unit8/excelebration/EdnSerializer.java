@@ -49,6 +49,11 @@ public class EdnSerializer implements Visitor {
     }
 
     @Override
+    public void visit(AnchorLinkNode anchorLinkNode) {
+        visitText(anchorLinkNode);
+    }
+
+    @Override
     public void visit(AutoLinkNode node) {
         // TODO
     }
@@ -222,6 +227,7 @@ public class EdnSerializer implements Visitor {
     @Override
     public void visit(TableBodyNode node) {
         // toVector(node, "tbody");
+        visitChildren(node);
     }
 
     @Override
@@ -245,8 +251,7 @@ public class EdnSerializer implements Visitor {
         PersistentVector orig = current;
         current = tag;
         visitChildren(node);
-        orig.cons(current);
-        current = orig;
+        current = orig.cons(current);
 
         currentTableColumn += node.getColSpan();
 

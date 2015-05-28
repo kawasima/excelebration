@@ -30,7 +30,7 @@
   (str "The following errors occurred while parsing your command:\n\n"
     (string/join \newline errors)))
 
-(defn exit [status msg]
+(defn- exit [status msg]
   (println msg)
   (System/exit status))
 
@@ -41,5 +41,7 @@
       ;(not= (count arguments) 1) (exit 1 (usage summary))
       errors (exit 1 (error-msg errors)))
     (let [{:keys [input output format] :or {output *out* format :excel}} options]
+      (when-not input
+        (exit -1 "Input file is required."))
       (publish input output (keyword format) options))))
     

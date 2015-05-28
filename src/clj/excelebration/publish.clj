@@ -1,8 +1,9 @@
 (ns excelebration.publish
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
-    [axebomber.renderer.html :as renderer-html]
-    [axebomber.renderer.excel :as renderer-excel])
+            [axebomber.renderer.html :as renderer-html]
+            [axebomber.renderer.excel :as renderer-excel]
+            [clojure.tools.logging :as log])
   (:use [hiccup core page]
         [axebomber.usermodel :only [create-workbook to-grid]]
         [axebomber.style :only [create-style]])
@@ -44,10 +45,12 @@
                [:body])))))
 
 (defn- parse-markdown [rdr]
-  (-> (.. (EdnSerializer.)
-        (toEdn (.. (PegDownProcessor. Extensions/ALL)
-                 (parseMarkdown (.toCharArray (string/join "\n" (line-seq rdr)))))))
-    (.replace \newline \space)))
+  (let [edn-str (-> (.. (EdnSerializer.)
+                        (toEdn (.. (PegDownProcessor. Extensions/ALL)
+                                   (parseMarkdown (.toCharArray (string/join "\n" (line-seq rdr)))))))
+                    (.replace \newline \space))]
+    (log/info edn-str)
+    edn-str))
 
 (defn read-template [file]
   (with-open [r (java.io.PushbackReader. (io/reader file))]

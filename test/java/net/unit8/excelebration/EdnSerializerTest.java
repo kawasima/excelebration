@@ -23,7 +23,7 @@ public class EdnSerializerTest {
 
     @Before
     public void setUpMarkdown() throws IOException {
-        Path mdFile = Paths.get("dev-resources/test1.md");
+        Path mdFile = Paths.get("dev-resources/gfm.md");
         String markdownSource = new String(Files.readAllBytes(mdFile));
         PegDownProcessor processor = new PegDownProcessor(Extensions.ALL);
         rootNode = processor.parseMarkdown(markdownSource.toCharArray());
