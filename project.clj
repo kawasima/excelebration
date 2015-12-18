@@ -1,6 +1,6 @@
-(defproject net.unit8/excelebration "0.1.0-SNAPSHOT"
+(defproject net.unit8/excelebration "0.1.0"
   :dependencies [[org.clojure/clojure "1.6.0"]
-                 [net.unit8/axebomber-clj "0.1.1-SNAPSHOT"]
+                 [net.unit8/axebomber-clj "0.1.1"]
                  [org.pegdown/pegdown "1.5.0"]
                  [org.clojure/tools.logging "0.3.1"]
                  [org.clojure/tools.cli "0.3.1"]

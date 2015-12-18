@@ -38,11 +38,11 @@
   (write-workbook [_ wtr]
     (let [sheet [:div.jagrid]]
       (.write wtr
-              (html5
-               [:head
-                (include-css "jagrid.css")
-                (include-js  "jagrid.js")]
-               [:body])))))
+              (.getBytes (html5
+                          [:head
+                           (include-css "jagrid.css")
+                           (include-js  "jagrid.js")]
+                          [:body sheet]))))))
 
 (defn- parse-markdown [rdr]
   (let [edn-str (-> (.. (EdnSerializer.)
