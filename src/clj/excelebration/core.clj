@@ -1,7 +1,8 @@
 (ns excelebration.core
   (:require [clojure.tools.cli :refer [parse-opts]]
-            [clojure.string :as string])
-  (:use [excelebration.publish :only [publish]]))
+            [clojure.string :as string]
+            [clojure.tools.logging :as log]
+            [excelebration.publish :refer [publish]]))
 
 (def cli-options
   ;; An option with a required argument
@@ -31,7 +32,7 @@
     (string/join \newline errors)))
 
 (defn- exit [status msg]
-  (println msg)
+  (log/info msg)
   (System/exit status))
 
 (defn -main [& args]
@@ -44,4 +45,3 @@
       (when-not input
         (exit -1 "Input file is required."))
       (publish input output (keyword format) options))))
-    

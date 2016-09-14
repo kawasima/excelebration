@@ -3,10 +3,11 @@
             [clojure.string :as string]
             [axebomber.renderer.html :as renderer-html]
             [axebomber.renderer.excel :as renderer-excel]
-            [clojure.tools.logging :as log])
-  (:use [hiccup core page]
-        [axebomber.usermodel :only [create-workbook to-grid]]
-        [axebomber.style :only [create-style]])
+            [clojure.tools.logging :as log]
+            [hiccup.core :refer :all]
+            [hiccup.page :refer :all]
+            [axebomber.usermodel :refer [create-workbook to-grid]]
+            [axebomber.style :refer [create-style]])
   (:import  [org.pegdown PegDownProcessor Extensions]
             [net.unit8.excelebration EdnSerializer]))
 
@@ -23,11 +24,11 @@
     (create-style "h3" :margin-top 1 :font-weight "bold")
     (create-style "ul" :margin-left 1))
   (create-sheet [_ sheet-name]
-    (println "createSheet:" sheet-name)
+    (log/info "createSheet:" sheet-name)
     (to-grid (.createSheet workbook sheet-name)))
   (get-render-fn [_] renderer-excel/render)
   (write-workbook [_ wtr]
-    (println "Write workbook")
+    (log/info "Write workbook")
     (.write workbook wtr)))
 
 (deftype HtmlRenderer [workbook]
