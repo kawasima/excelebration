@@ -1,4 +1,4 @@
-(defproject net.unit8.excelebration/excelebration "0.1.0"
+(defproject net.unit8.excelebration/excelebration "0.2.0"
   :description "A document generator from markdown or S-expression to HTML and MS-Excel."
   :url "https://github.com/kawasima/excelebration"
   :license {:name "Eclipse Public Licese - v 1.0"
@@ -7,7 +7,7 @@
             :comments "same as Clojure"}
 
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [net.unit8/axebomber-clj "0.1.1"]
+                 [net.unit8.axebomber/axebomber-clj "0.1.1"]
                  [org.pegdown/pegdown "1.6.0"]
                  [org.clojure/tools.logging "0.3.1"]
                  [org.clojure/tools.cli "0.3.5"]
