@@ -1,0 +1,14 @@
+services:
+  excelebration-server:
+    build: .
+    ports:
+      - "4433:4433/udp"
+    environment:
+      - CERT_HOSTS=192.168.1.8
+      - RUST_LOG=info
+    volumes:
+      - cert-data:/app/certs
+      - ../.env.local:/app/.env.local
+
+volumes:
+  cert-data:

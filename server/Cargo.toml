@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "crates/excelebration-core",
+    "crates/excelebration-server",
+]
+resolver = "2"
