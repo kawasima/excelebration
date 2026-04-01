@@ -501,7 +501,9 @@ dependencies = [
  "arrow-array",
  "arrow-ipc",
  "arrow-schema",
+ "http",
  "serde_json",
+ "url",
 ]
 
 [[package]]
@@ -524,6 +526,7 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+ "url",
  "web-transport-quinn",
  "x509-parser",
 ]

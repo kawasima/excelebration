@@ -20,6 +20,8 @@ export type SheetOptions = {
   onSync?: (payload: SyncPayload) => Promise<SyncResult>
   serverUrl?: string
   certFingerprint?: string
+  /** Search/filter parameters sent to the server as URL query parameters. */
+  searchParams?: Record<string, string>
 }
 
 export function useSheet(options: SheetOptions) {
@@ -30,7 +32,7 @@ export function useSheet(options: SheetOptions) {
   console.log('[useSheet] serverUrl=', options.serverUrl, 'columns.length=', serverColumns.length)
   useServerLoad(
     options.serverUrl
-      ? { serverUrl: options.serverUrl, columns: serverColumns, primaryKey: options.primaryKey, certFingerprint: options.certFingerprint, dispatch }
+      ? { serverUrl: options.serverUrl, columns: serverColumns, primaryKey: options.primaryKey, certFingerprint: options.certFingerprint, searchParams: options.searchParams, dispatch }
       : null,
   )
 
@@ -73,7 +75,7 @@ export function useSheet(options: SheetOptions) {
     let result: SyncResult
     if (options.serverUrl) {
       // WebTransport sync
-      result = await syncViaWebTransport(options.serverUrl, options.certFingerprint, payload, options.primaryKey)
+      result = await syncViaWebTransport(options.serverUrl, options.certFingerprint, payload, options.primaryKey, options.searchParams)
     } else if (options.onSync) {
       result = await options.onSync(payload)
     } else {

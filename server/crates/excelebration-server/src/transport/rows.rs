@@ -8,6 +8,7 @@ const BATCH_SIZE: usize = 5000;
 pub async fn handle_get_rows<D: DataSource>(
     session: web_transport_quinn::Session,
     source: &D,
+    ctx: &D::Context,
 ) -> Result<()> {
     let schema = source.schema();
     let mut send = session.open_uni().await?;
@@ -15,7 +16,7 @@ pub async fn handle_get_rows<D: DataSource>(
     let mut total_rows = 0;
 
     loop {
-        let batch = source.fetch_batch(offset, BATCH_SIZE).await?;
+        let batch = source.fetch_batch(ctx, offset, BATCH_SIZE).await?;
         match batch {
             Some(batch) if batch.num_rows() > 0 => {
                 let num_rows = batch.num_rows();

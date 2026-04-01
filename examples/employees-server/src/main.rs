@@ -30,11 +30,13 @@ impl EmployeeSource {
 }
 
 impl DataSource for EmployeeSource {
+    type Context = ();
+
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
 
-    async fn fetch_batch(&self, offset: usize, limit: usize) -> Result<Option<RecordBatch>> {
+    async fn fetch_batch(&self, _ctx: &(), offset: usize, limit: usize) -> Result<Option<RecordBatch>> {
         let rows = sqlx::query_as::<_, (i32, String, Option<f64>, Option<String>, Option<String>, Option<String>, Option<String>)>(
             "SELECT id, name, age, dept, join_date, email, note FROM employees ORDER BY id LIMIT ? OFFSET ?"
         )
@@ -95,7 +97,7 @@ impl DataSource for EmployeeSource {
         Ok(Some(batch))
     }
 
-    async fn upsert(&self, batch: RecordBatch) -> Result<Vec<String>> {
+    async fn upsert(&self, _ctx: &(), batch: RecordBatch) -> Result<Vec<String>> {
         let rows = excelebration_server::convert::batch_to_rows(&batch);
         let mut accepted = Vec::new();
 
@@ -162,7 +164,7 @@ impl DataSource for EmployeeSource {
         Ok(accepted)
     }
 
-    async fn delete(&self, row_ids: Vec<String>) -> Result<Vec<String>> {
+    async fn delete(&self, _ctx: &(), row_ids: Vec<String>) -> Result<Vec<String>> {
         let mut accepted = Vec::new();
         for row_id in &row_ids {
             // row_id is the stringified `id` value when primaryKey="id" is set
@@ -273,7 +275,7 @@ async fn main() -> Result<()> {
 
     let source = Arc::new(EmployeeSource::new(pool));
     let addr: SocketAddr = "0.0.0.0:4433".parse()?;
-    excelebration_server::run(addr, source, |fp| {
+    excelebration_server::run(addr, source, |_req| Ok(()), |fp| {
         println!("CERT_FINGERPRINT={}", fp.hex);
         println!("CERT_FINGERPRINT_B64={}", fp.base64);
 

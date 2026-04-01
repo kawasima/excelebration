@@ -111,13 +111,19 @@ pub struct CertFingerprint {
 
 /// Start the Excelebration WebTransport server with the given `DataSource`.
 ///
-/// Returns certificate fingerprint info via the `on_ready` callback before
-/// entering the accept loop. Use this to write `.env.local` or log fingerprints.
-pub async fn run<D: DataSource>(
+/// - `extract_context`: Called for each incoming connection to produce a
+///   `D::Context` from the request URL and headers. Return `Err` to reject.
+/// - `on_ready`: Called once with the certificate fingerprint before accepting connections.
+pub async fn run<D, F>(
     addr: SocketAddr,
     source: Arc<D>,
+    extract_context: F,
     on_ready: impl FnOnce(&CertFingerprint),
-) -> Result<()> {
+) -> Result<()>
+where
+    D: DataSource,
+    F: Fn(&excelebration_core::RequestInfo) -> Result<D::Context> + Send + Sync + 'static,
+{
     let hosts: Vec<String> = std::env::var("CERT_HOSTS")
         .unwrap_or_else(|_| "localhost".to_string())
         .split(',')
@@ -150,9 +156,27 @@ pub async fn run<D: DataSource>(
 
     info!("WebTransport server listening on {}", addr);
 
+    let extract_context = Arc::new(extract_context);
+
     while let Some(request) = server.accept().await {
         let path = request.url.path().to_string();
         info!("WebTransport request: {}", path);
+
+        // Build RequestInfo from the incoming connection
+        let req_info = excelebration_core::RequestInfo {
+            url: request.url.clone(),
+            headers: request.headers.clone(),
+        };
+
+        let ctx = match (extract_context)(&req_info) {
+            Ok(ctx) => Arc::new(ctx),
+            Err(e) => {
+                warn!("Context extraction failed: {e:#}");
+                let _ = request.reject(http::StatusCode::UNAUTHORIZED).await;
+                continue;
+            }
+        };
+
         let source = source.clone();
         tokio::spawn(async move {
             match path.as_str() {
@@ -164,7 +188,7 @@ pub async fn run<D: DataSource>(
                             return;
                         }
                     };
-                    if let Err(e) = super::rows::handle_get_rows(session, source.as_ref()).await {
+                    if let Err(e) = super::rows::handle_get_rows(session, source.as_ref(), ctx.as_ref()).await {
                         warn!("handle_get_rows error: {e:#}");
                     }
                 }
@@ -176,7 +200,7 @@ pub async fn run<D: DataSource>(
                             return;
                         }
                     };
-                    if let Err(e) = super::sync::handle_sync(session, source.as_ref()).await {
+                    if let Err(e) = super::sync::handle_sync(session, source.as_ref(), ctx.as_ref()).await {
                         warn!("handle_sync error: {e:#}");
                     }
                 }

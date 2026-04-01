@@ -7,10 +7,11 @@ use std::future::Future;
 ///
 /// The boundary type is Arrow `RecordBatch` — Excelebration handles
 /// WebTransport + Arrow IPC serialization; you handle data access.
-///
-/// The returned `RecordBatch` values should conform to the schema returned by
-/// [`schema()`]. Excelebration manages row tracking internally via `_rowId`.
 pub trait DataSource: Send + Sync + 'static {
+    /// User-defined per-request context (search conditions, auth info, etc.).
+    /// Use `()` if no context is needed.
+    type Context: Send + Sync + 'static;
+
     /// The Arrow schema for rows served by this data source.
     fn schema(&self) -> SchemaRef;
 
@@ -18,11 +19,9 @@ pub trait DataSource: Send + Sync + 'static {
     ///
     /// Return a `RecordBatch` conforming to [`schema()`].
     /// Return `None` when there are no more rows.
-    ///
-    /// The server calls this repeatedly with increasing offsets to stream
-    /// data to the client in batches, so the first batch arrives immediately.
     fn fetch_batch(
         &self,
+        ctx: &Self::Context,
         offset: usize,
         limit: usize,
     ) -> impl Future<Output = Result<Option<RecordBatch>>> + Send;
@@ -30,9 +29,17 @@ pub trait DataSource: Send + Sync + 'static {
     /// Apply upserts. `batch` conforms to [`schema()`] plus a `_rowId` column (Utf8)
     /// prepended by the framework.
     /// Return the `_rowId` values that were successfully applied.
-    fn upsert(&self, batch: RecordBatch) -> impl Future<Output = Result<Vec<String>>> + Send;
+    fn upsert(
+        &self,
+        ctx: &Self::Context,
+        batch: RecordBatch,
+    ) -> impl Future<Output = Result<Vec<String>>> + Send;
 
     /// Delete rows. `row_ids` contains the `_rowId` values from the client.
     /// Return the `_rowId` values that were successfully deleted.
-    fn delete(&self, row_ids: Vec<String>) -> impl Future<Output = Result<Vec<String>>> + Send;
+    fn delete(
+        &self,
+        ctx: &Self::Context,
+        row_ids: Vec<String>,
+    ) -> impl Future<Output = Result<Vec<String>>> + Send;
 }

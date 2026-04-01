@@ -5,6 +5,7 @@ export async function syncViaWebTransport(
   certFingerprint: string | undefined,
   payload: SyncPayload,
   primaryKey?: string,
+  searchParams?: Record<string, string>,
 ): Promise<SyncResult> {
   const arrow = await import('apache-arrow')
   const { tableFromIPC, tableToIPC, Utf8, vectorFromArray, makeTable } = arrow
@@ -16,7 +17,8 @@ export async function syncViaWebTransport(
     ? { serverCertificateHashes: [{ algorithm: 'sha-256', value: hexToBuffer(certFingerprint) }] }
     : {}
 
-  const transport = new WebTransport(serverUrl + '/api/sync', options)
+  const syncUrl = buildUrl(serverUrl, '/api/sync', searchParams)
+  const transport = new WebTransport(syncUrl, options)
   await transport.ready
 
   try {
@@ -109,6 +111,16 @@ async function readLengthPrefixed(
   const length = new DataView(lenBytes.buffer, lenBytes.byteOffset, 4).getUint32(0, false)
   if (length === 0) return null
   return readExact(length)
+}
+
+function buildUrl(base: string, path: string, params?: Record<string, string>): string {
+  const url = new URL(path, base)
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      url.searchParams.set(k, v)
+    }
+  }
+  return url.toString()
 }
 
 function hexToBuffer(hex: string): ArrayBuffer {

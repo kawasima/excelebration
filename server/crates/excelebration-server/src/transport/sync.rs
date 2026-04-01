@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tracing::info;
 use web_transport_quinn::Session;
 
-pub async fn handle_sync<D: DataSource>(session: Session, source: &D) -> Result<()> {
+pub async fn handle_sync<D: DataSource>(session: Session, source: &D, ctx: &D::Context) -> Result<()> {
     info!("DoPut /api/sync — waiting for client stream");
 
     let (mut send, mut recv) = session.accept_bi().await?;
@@ -36,14 +36,14 @@ pub async fn handle_sync<D: DataSource>(session: Session, source: &D) -> Result<
     let mut accepted_ids: Vec<String> = Vec::new();
 
     if let Some(batch) = payload.upsert_batch {
-        match source.upsert(batch).await {
+        match source.upsert(ctx, batch).await {
             Ok(ids) => accepted_ids.extend(ids),
             Err(e) => tracing::warn!("upsert failed: {e:#}"),
         }
     }
 
     if !payload.deletes.is_empty() {
-        match source.delete(payload.deletes).await {
+        match source.delete(ctx, payload.deletes).await {
             Ok(ids) => accepted_ids.extend(ids),
             Err(e) => tracing::warn!("delete failed: {e:#}"),
         }
