@@ -1,10 +1,11 @@
 use anyhow::Result;
-use arrow_array::builder::{Float64Builder, Int32Builder, StringBuilder};
-use arrow_array::{Array, RecordBatch};
+use arrow_array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use excelebration_server::DataSource;
+use serde_json::Value;
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::info;
@@ -37,7 +38,7 @@ impl DataSource for EmployeeSource {
     }
 
     async fn fetch_batch(&self, _ctx: &(), offset: usize, limit: usize) -> Result<Option<RecordBatch>> {
-        let rows = sqlx::query_as::<_, (i32, String, Option<f64>, Option<String>, Option<String>, Option<String>, Option<String>)>(
+        let rows = sqlx::query(
             "SELECT id, name, age, dept, join_date, email, note FROM employees ORDER BY id LIMIT ? OFFSET ?"
         )
         .bind(limit as i64)
@@ -49,52 +50,22 @@ impl DataSource for EmployeeSource {
             return Ok(None);
         }
 
-        let mut id_b = Int32Builder::with_capacity(rows.len());
-        let mut name_b = StringBuilder::new();
-        let mut age_b = Float64Builder::with_capacity(rows.len());
-        let mut dept_b = StringBuilder::new();
-        let mut join_date_b = StringBuilder::new();
-        let mut email_b = StringBuilder::new();
-        let mut note_b = StringBuilder::new();
+        let maps: Vec<HashMap<String, Value>> = rows
+            .iter()
+            .map(|row| {
+                let mut m = HashMap::new();
+                m.insert("id".into(), row.get::<i32, _>("id").into());
+                m.insert("name".into(), Value::String(row.get("name")));
+                m.insert("age".into(), row.try_get::<f64, _>("age").ok().map_or(Value::Null, |v| v.into()));
+                for col in ["dept", "join_date", "email", "note"] {
+                    let key = if col == "join_date" { "joinDate" } else { col };
+                    m.insert(key.into(), row.try_get::<String, _>(col).ok().map_or(Value::Null, Value::String));
+                }
+                m
+            })
+            .collect();
 
-        for (id, name, age, dept, join_date, email, note) in &rows {
-            id_b.append_value(*id);
-            name_b.append_value(name);
-            match age {
-                Some(v) => age_b.append_value(*v),
-                None => age_b.append_null(),
-            }
-            match dept {
-                Some(v) => dept_b.append_value(v),
-                None => dept_b.append_null(),
-            }
-            match join_date {
-                Some(v) => join_date_b.append_value(v),
-                None => join_date_b.append_null(),
-            }
-            match email {
-                Some(v) => email_b.append_value(v),
-                None => email_b.append_null(),
-            }
-            match note {
-                Some(v) => note_b.append_value(v),
-                None => note_b.append_null(),
-            }
-        }
-
-        let batch = RecordBatch::try_new(
-            self.schema.clone(),
-            vec![
-                Arc::new(id_b.finish()) as Arc<dyn Array>,
-                Arc::new(name_b.finish()) as Arc<dyn Array>,
-                Arc::new(age_b.finish()) as Arc<dyn Array>,
-                Arc::new(dept_b.finish()) as Arc<dyn Array>,
-                Arc::new(join_date_b.finish()) as Arc<dyn Array>,
-                Arc::new(email_b.finish()) as Arc<dyn Array>,
-                Arc::new(note_b.finish()) as Arc<dyn Array>,
-            ],
-        )?;
-        Ok(Some(batch))
+        Ok(Some(excelebration_server::convert::rows_to_batch(&self.schema, &maps)?))
     }
 
     async fn upsert(&self, _ctx: &(), batch: RecordBatch) -> Result<Vec<String>> {
