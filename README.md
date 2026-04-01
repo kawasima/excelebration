@@ -15,7 +15,7 @@ Excelebration provides both a **React client library** and a **Rust server libra
 │    └─ SheetToolbar       │  over    │    └─ Arrow serializer   │
 │    └─ SheetStatusBar     │  QUIC    │                          │
 │                          │          │  Your DataSource impl    │
-│  Zod schema → columns   │          │    └─ fetch_all()        │
+│  Zod schema → columns   │          │    └─ fetch_batch()      │
 │  Virtual scrolling       │          │    └─ upsert()           │
 │  Undo/Redo               │          │    └─ delete()           │
 └──────────────────────────┘          └──────────────────────────┘
@@ -46,14 +46,23 @@ excelebration/
 Implement the `DataSource` trait for your data source:
 
 ```rust
-use excelebration_server::DataSource;
+use excelebration_core::DataSource;
 use arrow_array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 use std::sync::Arc;
 
 struct MySource { /* your DB pool, API client, etc. */ }
 
+/// Per-request context extracted from URL query params and headers.
+/// Use `()` if no context is needed.
+struct MyContext {
+    user_id: String,
+    search_filter: Option<String>,
+}
+
 impl DataSource for MySource {
+    type Context = MyContext;
+
     fn schema(&self) -> SchemaRef {
         Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int32, false),
@@ -62,15 +71,21 @@ impl DataSource for MySource {
         ]))
     }
 
-    async fn fetch_all(&self) -> anyhow::Result<Vec<RecordBatch>> {
-        // Query your database, return Arrow RecordBatch
+    async fn fetch_batch(
+        &self,
+        ctx: &MyContext,
+        offset: usize,
+        limit: usize,
+    ) -> anyhow::Result<Option<RecordBatch>> {
+        // Build WHERE clause from ctx, then SELECT ... LIMIT limit OFFSET offset
+        // Return None when no more rows
     }
 
-    async fn upsert(&self, batch: RecordBatch) -> anyhow::Result<Vec<String>> {
+    async fn upsert(&self, ctx: &MyContext, batch: RecordBatch) -> anyhow::Result<Vec<String>> {
         // Apply inserts/updates, return accepted _rowId values
     }
 
-    async fn delete(&self, row_ids: Vec<String>) -> anyhow::Result<Vec<String>> {
+    async fn delete(&self, ctx: &MyContext, row_ids: Vec<String>) -> anyhow::Result<Vec<String>> {
         // Delete rows, return accepted _rowId values
     }
 }
@@ -78,9 +93,23 @@ impl DataSource for MySource {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let source = Arc::new(MySource { /* ... */ });
-    excelebration_server::run("0.0.0.0:4433".parse()?, source, |fp| {
-        println!("Certificate fingerprint: {}", fp.hex);
-    }).await
+    excelebration_server::run(
+        "0.0.0.0:4433".parse()?,
+        source,
+        |req_info| {
+            // Extract context from request URL and headers.
+            // Return Err to reject the connection (401).
+            let user_id = req_info.headers.get("x-user-id")
+                .and_then(|v| v.to_str().ok())
+                .ok_or_else(|| anyhow::anyhow!("missing x-user-id header"))?
+                .to_string();
+            let search_filter = req_info.url.query_pairs()
+                .find(|(k, _)| k == "filter")
+                .map(|(_, v)| v.to_string());
+            Ok(MyContext { user_id, search_filter })
+        },
+        |fp| println!("Certificate fingerprint: {}", fp.hex),
+    ).await
 }
 ```
 
@@ -129,11 +158,12 @@ function App() {
 
 ### Server Library (`excelebration-server`)
 
-- **`DataSource` trait** — implement 4 methods to connect any data source
+- **`DataSource` trait** — implement `schema()`, `fetch_batch()`, `upsert()`, `delete()`
+- **Per-request `Context`** — extract search conditions and auth info from URL/headers; reject unauthorized connections
 - **Arrow `RecordBatch` boundary** — no intermediate structs; work directly with columnar data
 - **WebTransport (QUIC)** — multiplexed, low-latency streaming
 - **Automatic TLS** — self-signed ECDSA P-256 certificates with auto-renewal
-- **Batch streaming** — streams large datasets in configurable batches
+- **Batch streaming** — paginated `fetch_batch(offset, limit)` streams rows incrementally
 - **Convert helpers** — `rows_to_batch()` / `batch_to_rows()` for `HashMap<String, Value>` interop
 
 ## Running the Example
